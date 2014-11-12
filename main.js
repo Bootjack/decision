@@ -35,11 +35,13 @@ function _inherit (obj, model) {
  * past uses under different circumstances, producing
  * different outcomes.
  * 
- * Factors are both the names of the properties with an
- * aggregate effect on the outcome and the specific state
- * of those factors at the time of a given instance
- **/
-
+ * Factors are the inputs available at the time of a given 
+ * instance of performing an action. Outcomes are the 
+ * aggregate effect on the input state afte rthe action
+ * was performed.
+ * 
+ * TODO: This nomenclature is confusing; add the term "instances to help distinguish from inputs and outputs
+ */
 function Action (config) {
     var factors, fname, func, iterator, outcomes;
     fname = config.name;
@@ -66,6 +68,16 @@ function Action (config) {
     return action;
 }
 
+/**
+ * Every time an action is run, regardless who called it, the inputs
+ * and outcomes are logged. This method iterates over that entire
+ * history and calculates the aggregate results. The object returned
+ * contains a key for every factor included at least once in the log.
+ * For each key, the results include count, sum, max, min, and mean.
+ * @param config {Object} Configuration specifying:
+ *    - type: either 'factors' or 'outcomes' (can only report one)
+ * @returns aggregate {Object} keyed to all factors with summary data for each
+ */
 Action.prototype.aggregate = function (config) {
     var f, i, aggregate, difference, factors, instance;
     
@@ -73,18 +85,30 @@ Action.prototype.aggregate = function (config) {
     factors = (config.type && this[config.type]) || this.factors;
     aggregate = {};
     
+    /**
+     * For every instance the action was called, calculate aggregate results and modify the 
+     * aggregate object values keyed by the name of the factor.
+     */
     for (i = 0; i < factors.length; i += 1) {
         inputs = this.factors[i];
         oucomes = this.outcomes[i];
         for (f in inputs) {
             if (inputs.hasOwnProperty(f)) {
+                // Initialize this keyed aggregate object as needed
                 aggregate[f] = aggregate[f] || {};
+                
+                // Initialize count and sum values as needed
                 if ('undefined' === typeof aggregate[f].count) {
                     aggregate[f].count = 0;
                 }
                 if ('undefined' === typeof aggregate[f].sum) {
                     aggregate[f].sum = 0;
                 }
+                
+                /**
+                 * Update aggregate values for all functions. This may feel unnecessarily redundant,
+                 * but this iteration occurs over every instance 
+                 */
                 if ('outcomes' === config.type) {
                     difference = outcomes[f] - inputs[f];
                     if ('undefined' === typeof aggregate[f].max || difference > aggregate[f].max) {
@@ -94,7 +118,7 @@ Action.prototype.aggregate = function (config) {
                         aggregate[f].min = difference;
                     }
                     aggregate[f].count += 1;
-                    aggregate[f].sum += outcomes[f] - inputs[f];
+                    aggregate[f].sum += difference;
                     aggregate[f].mean = aggregate[f].sum / aggregate[f].count;
                 } else {
                     if ('undefined' === typeof aggregate[f].max || inputs[f] > aggregate[f].max) {
@@ -114,17 +138,35 @@ Action.prototype.aggregate = function (config) {
     return aggregate;
 };
 
+/**
+ * 
+ */
 Action.prototype.profile = function () {
     var f, i, p, aggregate, inputs, isNewProfile, outcomes, profile, profiles;
     
     aggregate = this.aggregate();
     profiles = [];
     
+    /**
+     * Categorize every instance of each factor as compared to the aggregate
+     * values for that factor, grouping instances that compare similarly into
+     * profiles for more generic analysis.
+     */
     for (i = 0; i < this.factors.length; i += 1) {
         inputs = this.factors[i];
         outcomes = this.outcomes[i];
+        
+        /**
+         * Every factor gets its own set of up to three profiles (positive, negative, or neutral),
+         * and each profile contains a list of all inputs matching that profile.
+         */
         for (f in inputs) {
             profile = {};
+            /**
+             * Determine whether the input was higher or lower than normal, where any value
+             * within +/- 10% of the mean is considered normal. Assign 1, -1, or 0 for values
+             * above normal, below normal, or at normal, respectively.
+             */
             if (inputs.hasOwnProperty(f)) {
                 if (inputs[f] > aggregate[f].mean + 0.1 * (aggregate[f].max - aggregate[f].mean)) {
                     profile[f] = 1;              
@@ -134,6 +176,10 @@ Action.prototype.profile = function () {
                     profile[f] = 0;
                 }
             }
+            /**
+             * Check whether a profile already exists for this factor-comparison pair and insert
+             * a new profile as needed into the profiles array returned by this profile() method.
+             */
             isNewProfile = true;
             for (p = 0; p < profiles.length; p += 1) {
                 if (_compare(profiles[p].profile, profile)) {
@@ -149,7 +195,10 @@ Action.prototype.profile = function () {
     }
   
     for (i = 0; i < profiles.length; i += 1) {
-        
+        /**
+         * TODO: Iterate over each profile and get an aggregate outcome for only the specific set
+         * of instances specified by the profile.
+         */
     }
     
     return profiles;
