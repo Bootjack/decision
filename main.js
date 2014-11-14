@@ -51,7 +51,7 @@ function Action (config) {
         instance.before = _clone(this.factors);
         func.apply(this, arguments);
         instance.after = _clone(this.factors);
-        this.instances.push(instance);
+        instances.push(instance);
     };
     action.fname = fname;
     action.instances = instances;
@@ -190,14 +190,14 @@ Action.prototype.profile = function () {
                  */
                 isNewProfile = true;
                 for (p = 0; p < profiles.length; p += 1) {
-                    if (_compare(profiles[p].profile, profile)) {
+                    if (_compare(profiles[p].definition, profile)) {
                         profiles[p].instances.push(instance);
                         isNewProfile = false;
                         break;
                     }
                 }
                 if (isNewProfile) {
-                    profiles.push({profile: profile, instances: [instance]});
+                    profiles.push({definition: profile, instances: [instance]});
                 }
             }
         }
@@ -207,16 +207,21 @@ Action.prototype.profile = function () {
 };
 
 Action.prototype.summarize = function () {
-    var i, profiles;
+    var i, profiles, outcome, result, that;
     
+    that = this;
     profiles = this.profile();
+
+    /**
+     * Iterate over each profile and get an aggregate outcome for only the specific set
+     * of instances specified by the profile.
+     */    
+    result = profiles.map(function (profile) {
+        var outcome = that.aggregate({type: 'outcome', instances: profile.instances});
+        return {profile: profile.definition, outcome: outcome};
+    });
     
-    for (i = 0; i < profiles.length; i += 1) {
-        /**
-         * TODO: Iterate over each profile and get an aggregate outcome for only the specific set
-         * of instances specified by the profile.
-         */
-    }
+    return result;
 }
 
 /**
@@ -248,6 +253,7 @@ function Sensor (config) {
     var accuracy, precision, spectra, world;
     
     world = config.world || window;
+
     spectra = config.spectra || [];
     tolerance = config.tolerance || 0;
     granularity = config.granularity || 0;
@@ -280,6 +286,7 @@ function Sensor (config) {
         return values;
     };
     
+    sensor.label = config.label;
     sensor.tolerance = tolerance;
     sensor.granularity = granularity;
     
@@ -303,19 +310,19 @@ function Decider (config) {
 Decider.prototype.addAction = function (action) {
     if (!this.hasOwnProperty(action.fname)) {
         this[action.fname] = action.bind(this);
-        this.actions[action.fname] = this[action.fname];
+        this.actions[action.fname] = action;
     }
 };
 
 Decider.prototype.addSensor = function (sensor) {
-    this.sensors[sensor.name] = sensor;
+    this.sensors[sensor.label] = sensor;
 };
 
 Decider.prototype.readSensors = function () {
-    var i, sensor, sensorName, spectra, spectrumName;
-    for (sensorName in this.sensors) {
-        if (this.sensors.hasOwnProperty(sensorName)) {
-            spectra = this.sensors[sensorName]();
+    var i, sensor, sensorLabel, spectra, spectrumName;
+    for (sensorLabel in this.sensors) {
+        if (this.sensors.hasOwnProperty(sensorLabel)) {
+            spectra = this.sensors[sensorLabel]();
             for (spectrumName in spectra) {
                 if (spectra.hasOwnProperty(spectrumName)) {
                     this.factors[spectrumName] = spectra[spectrumName];

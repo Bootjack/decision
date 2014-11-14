@@ -1,4 +1,4 @@
-var dayCycle, decider, isLightOutside, lookOutside, sitThere;
+var dayCycle, decider, isLightOutside, lightSensor, lookOutside, powerSensor, sitThere;
 
 isLightOutside = 1;
 dayCycle = setInterval(function () {isLightOutside = (isLightOutside ? 0 : 1);}, 5000)
@@ -29,14 +29,21 @@ photosynthesize = new Action({
     }
 });
 
+decider = new Decider();
+
 lightSensor = new Sensor({
-    name: 'lightSensor',
+    label: 'lightSensor',
     spectra: ['isLightOutside']
 });
 
-decider = new Decider();
+powerSensor = new Sensor({
+    label: 'powerSensor',
+    spectra: ['_energy'],
+    world: decider
+});
 
 decider.addSensor(lightSensor);
+decider.addSensor(powerSensor);
 
 decider.addAction(sitThere);
 decider.addAction(lookOutside);
@@ -50,4 +57,5 @@ decider.energy = function (amount) {
     return this._energy.valueOf();
 }
 
+decider.energy();
 decider.sensorSweep = setInterval(function () {decider.readSensors();}, 16);
